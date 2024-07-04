@@ -1,0 +1,69 @@
+version: '3.3'
+
+services:
+
+  # Serviço "web" que hospeda a aplicação Flask
+  web:
+    build: ./app  # Diretório onde está localizado o Dockerfile para construir a imagem deste serviço
+    ports:
+      - "5000:5000"  # Mapeia a porta 5000 do container para a porta 5000 do host
+    depends_on:
+      db:  # Indica que este serviço depende do serviço "db"
+        condition: service_healthy  # Aguarda até que o serviço "db" esteja saudável
+    environment:
+      FLASK_ENV: development  # Define o ambiente do Flask como desenvolvimento
+      FLASK_APP: app.py  # Arquivo principal da aplicação Flask
+      POSTGRES_HOST: db  # Host onde o PostgreSQL está sendo executado
+      POSTGRES_PORT: 5432  # Porta do PostgreSQL
+      POSTGRES_DB: pdv  # Nome do banco de dados PostgreSQL utilizado pela aplicação
+      POSTGRES_USER: postgres  # Nome de usuário do PostgreSQL
+      POSTGRES_PASSWORD: 123456  # Senha do usuário do PostgreSQL
+      # Variáveis de ambiente para conexão com o PostgreSQL
+      DB_NAME: pdv
+      DB_USER: postgres
+      DB_PASSWORD: 123456
+      DB_HOST: db
+      DB_PORT: 5432
+    volumes:
+      - ./app:/app  # Monta o diretório local ./app dentro do container em /app
+    networks:
+      - backend  # Conecta este serviço à rede "backend"
+
+  # Serviço "db" que hospeda o banco de dados PostgreSQL
+  db:
+    image: postgres:latest  # Usa a imagem oficial mais recente do PostgreSQL no Docker Hub
+    environment:
+      POSTGRES_DB: pdv  # Nome do banco de dados a ser criado no PostgreSQL
+      POSTGRES_USER: postgres  # Nome de usuário do PostgreSQL
+      POSTGRES_PASSWORD: 123456  # Senha do usuário do PostgreSQL
+    ports:
+      - "5432:5432"  # Mapeia a porta 5432 do container (padrão do PostgreSQL) para a porta 5432 do host
+    volumes:
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql  # Monta o arquivo init.sql local como um script de inicialização do PostgreSQL
+      - ./db/create_tables_pdv.sql:/docker-entrypoint-initdb.d/create_tables_pdv.sql  # Monta o arquivo create_tables_pdv.sql local como um script para criar tabelas no banco de dados
+      - ./db/populate_tables_pdv.sql:/docker-entrypoint-initdb.d/populate_tables_pdv.sql  # Monta o arquivo populate_tables_pdv.sql local como um script para popular as tabelas com dados iniciais
+    networks:
+      - backend  # Conecta este serviço à rede "backend"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]  # Comando para verificar a saúde do serviço PostgreSQL
+      interval: 10s  # Intervalo entre as verificações de saúde
+      timeout: 5s  # Tempo limite para cada verificação de saúde
+      retries: 5  # Número de tentativas antes de considerar o serviço como indisponível
+
+  # Serviço "pgadmin" que hospeda o PgAdmin, interface web para gerenciar o PostgreSQL
+  pgadmin:
+    image: dpage/pgadmin4  # Usa a imagem oficial do PgAdmin 4 no Docker Hub
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@pgadmin.com  # Email padrão do administrador do PgAdmin
+      PGADMIN_DEFAULT_PASSWORD: 123456  # Senha padrão do administrador do PgAdmin
+    ports:
+      - "80:80"  # Mapeia a porta 80 do container (onde o PgAdmin estará rodando) para a porta 80 do host
+    depends_on:
+      - db  # Indica que este serviço depende do serviço "db"
+    networks:
+      - backend  # Conecta este serviço à rede "backend"
+
+# Define a rede "backend" para conectar todos os serviços
+networks:
+  backend:
+
